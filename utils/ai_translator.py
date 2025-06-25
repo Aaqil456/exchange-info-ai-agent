@@ -9,7 +9,7 @@ def translate_text_gemini(text):
         print(f"[Warning] Empty or invalid text received for translation: {text}")
         return ""
 
-    retries = 3
+    retries = 5
     for attempt in range(retries):
         try:
             gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -43,7 +43,7 @@ Do not translate brand names or product names."""}
                 print(f"[Warning] Gemini returned empty translation on attempt {attempt+1}. Retrying...")
         except Exception as e:
             print(f"[Error] Attempt {attempt+1} - Translation failed: {e}")
-            time.sleep(2)
+            time.sleep(3)
 
     print(f"[Error] All attempts failed to translate: {text[:60]}...")
-    return "Translation failed"
+    return ""
