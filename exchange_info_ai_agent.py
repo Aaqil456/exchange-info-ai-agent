@@ -26,20 +26,65 @@ async def main():
 
     for entry in channels_data:
         channel_username = extract_channel_username(entry["channel_link"])
-        messages = await fetch_latest_messages(telegram_api_id, telegram_api_hash, channel_username)
+        print(f"\n📡 Processing channel: {channel_username} (Exchange: {entry.get('exchange_name')})")
+
+        messages = await fetch_latest_messages(
+            telegram_api_id,
+            telegram_api_hash,
+            channel_username
+        )
 
         for msg in messages:
-            if msg["text"] in posted_messages:
+            original_text = msg["text"] or ""
+
+            # Skip kalau dah pernah post text yang sama
+            if original_text in posted_messages:
                 print(f"⚠️ Skipping duplicate message ID {msg['id']} from {channel_username}")
                 continue
 
-            translated = translate_text_gemini(msg["text"])
+            # ========== TRANSLATE + DEBUG ========== #
+            print("\n=== DEBUG TELEGRAM MESSAGE ===")
+            print("CHANNEL      :", channel_username)
+            print("EXCHANGE     :", entry.get("exchange_name"))
+            print("MESSAGE ID   :", msg["id"])
+            print("ORIGINAL TEXT:", repr(original_text[:300]))
+            print("LEN ORIGINAL :", len(original_text))
+
+            try:
+                translated = translate_text_gemini(original_text)
+            except Exception as e:
+                print(f"❌ translate_text_gemini error: {e}")
+                translated = ""
+
+            print("TRANSLATED   :", repr((translated or "")[:300]))
+            print("LEN TRANS    :", len(translated or ""))
+            print("================================\n")
+
+            # 👉 GUARD PENTING:
+            # Jangan hantar apa-apa kalau translation kosong
+            if not translated or not translated.strip():
+                print("❌ Translated text kosong (mungkin quota habis / error) – SKIP SEND untuk message ini.")
+                result_output.append({
+                    "exchange_name": entry["exchange_name"],
+                    "channel_link": entry["channel_link"],
+                    "original_text": original_text,
+                    "translated_text": translated,
+                    "referral_link": entry["referral_link"],
+                    "date": msg["date"],
+                    "message_id": msg["id"],
+                    "note": "SKIPPED_EMPTY_TRANSLATION_OR_QUOTA",
+                })
+                continue
+            # ========== END GUARD ========== #
 
             if msg["has_photo"]:
                 image_path = f"photo_{msg['id']}.jpg"
+
+                # Download photo dari source channel
                 async with TelegramClient("telegram_session", telegram_api_id, telegram_api_hash) as client:
                     await client.download_media(msg["raw"], image_path)
 
+                # Hantar photo + caption terjemahan
                 send_photo_to_telegram_channel(
                     image_path,
                     translated,
@@ -47,21 +92,25 @@ async def main():
                     referral_link=entry["referral_link"]
                 )
 
+                # Buang file temp
                 os.remove(image_path)
             else:
+                # Hantar text-only message
                 send_telegram_message_html(
                     translated_text=translated,
                     exchange_name=entry["exchange_name"],
                     referral_link=entry["referral_link"]
                 )
 
+            # Log apa yang betul-betul dipost
             result_output.append({
                 "exchange_name": entry["exchange_name"],
                 "channel_link": entry["channel_link"],
-                "original_text": msg["text"],
+                "original_text": original_text,
                 "translated_text": translated,
                 "referral_link": entry["referral_link"],
-                "date": msg["date"]
+                "date": msg["date"],
+                "message_id": msg["id"],
             })
 
     if result_output:
