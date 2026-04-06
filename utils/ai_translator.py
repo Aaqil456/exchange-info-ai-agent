@@ -30,7 +30,8 @@ def translate_text_gemini(text: str, model: str = GEMINI_MODEL) -> str:
         "No shouting words or unnecessary excitement.\n"
         "Keep it informative, approachable, and casual — but clean and neutral.\n"
         "Do not use emojis unless they appear in the original text.\n"
-        "Remove any external link or any social media link.\n"
+        "Remove any external link or any social media link and remove the sentence or word that is connected with the supposed link.\n"
+        "Remove any words or sentence that feels like call to action.\n"
         "Do not translate brand names or product names.\n\n"
         f"Text:\n{text}"
     )
